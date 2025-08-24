@@ -1094,9 +1094,9 @@ __metadata:
   languageName: node
   linkType: hard
 
-"glob-to-regex@workspace:.":
+"glob-to-regex.js@workspace:.":
   version: 0.0.0-use.local
-  resolution: "glob-to-regex@workspace:."
+  resolution: "glob-to-regex.js@workspace:."
   dependencies:
     "@biomejs/biome": "npm:^2.1.2"
     "@vitest/coverage-v8": "npm:^3.2.4"
