@@ -1,7 +1,7 @@
 import {describe, test, expect} from 'vitest';
 import {toRegex} from '..';
 
-describe('fs-tools/glob.toRegex', () => {
+describe('glob-to-regex/toRegex', () => {
   test('literal path', () => {
     const re = toRegex('a/b/c.txt');
     expect(re.test('a/b/c.txt')).toBe(true);

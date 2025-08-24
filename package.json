@@ -1,23 +1,30 @@
 {
-  "name": "CHANGEME",
+  "name": "glob-to-regex",
   "packageManager": "yarn@4.9.3",
   "publishConfig": {
     "access": "public"
   },
   "version": "0.0.1",
-  "description": "High-performance JSON Pointer implementation",
+  "description": "Transform GLOB patterns to JavaScript regular expressions for fast file path matching.",
   "author": {
     "name": "streamich",
     "url": "https://github.com/streamich"
   },
-  "homepage": "https://github.com/CHANGEME",
-  "repository": "CHANGEME",
+  "homepage": "https://github.com/streamich/glob-to-regex",
+  "repository": "streamich/glob-to-regex",
   "funding": {
     "type": "github",
     "url": "https://github.com/sponsors/streamich"
   },
   "keywords": [
-    "CHANGEME"
+    "glob",
+    "regex",
+    "regexp",
+    "pattern",
+    "matcher",
+    "path",
+    "filesystem",
+    "wildcard"
   ],
   "engines": {
     "node": ">=10.0"
