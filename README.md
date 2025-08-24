@@ -1,4 +1,4 @@
-# glob-to-regex
+# glob-to-regex.js
 
 Transform GLOB patterns to JavaScript regular expressions for fast file path matching.
 
@@ -7,15 +7,15 @@ This tiny library converts familiar shell-style glob patterns like `**/*.ts` or 
 ## Install
 
 ```bash
-yarn add glob-to-regex
+yarn add glob-to-regex.js
 # or
-npm i glob-to-regex
+npm i glob-to-regex.js
 ```
 
 ## Quick start
 
 ```ts
-import {toRegex, toMatcher} from 'glob-to-regex';
+import {toRegex, toMatcher} from 'glob-to-regex.js';
 
 // Build a RegExp from a glob
 const re = toRegex('src/**/test.ts');

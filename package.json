@@ -1,5 +1,5 @@
 {
-  "name": "glob-to-regex",
+  "name": "glob-to-regex.js",
   "packageManager": "yarn@4.9.3",
   "publishConfig": {
     "access": "public"
