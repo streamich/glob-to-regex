@@ -162,9 +162,5 @@ export const toMatcher = (pattern: Pattern): Matcher => {
       regexes.push(pat);
     }
   }
-  const length = regexes.length;
-  return (path) => {
-    for (let i = 0; i < length; i++) if (regexes[i].test(path)) return true;
-    return false;
-  };
+  return regexes.length ? new Function('p', 'return ' + regexes.map(r => r + '.test(p)').join('||')) as Matcher : () => false;
 };
