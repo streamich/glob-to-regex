@@ -168,5 +168,7 @@ export const toMatcher = (pattern: Pattern, options?: GlobOptions): Matcher => {
       regexes.push(pat);
     }
   }
-  return regexes.length ? new Function('p', 'return ' + regexes.map(r => r + '.test(p)').join('||')) as Matcher : () => false;
+  return regexes.length
+    ? (new Function('p', 'return ' + regexes.map((r) => r + '.test(p)').join('||')) as Matcher)
+    : () => false;
 };
