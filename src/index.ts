@@ -1,5 +1,10 @@
 const escapeRe = (ch: string) => (/[.^$+{}()|\\]/.test(ch) ? `\\${ch}` : ch);
 
+export interface GlobOptions {
+  /** Treat pattern as case insensitive */
+  nocase?: boolean;
+}
+
 /**
  * Convert a glob pattern to a regular expression
  *
@@ -11,7 +16,7 @@ const escapeRe = (ch: string) => (/[.^$+{}()|\\]/.test(ch) ? `\\${ch}` : ch);
  * - `{}` to group conditions (e.g. `{html,txt}`)
  * - `[abc]`, `[a-z]`, `[!a-z]`, `[!abc]` character classes
  */
-export const toRegex = (pattern: string): RegExp => {
+export const toRegex = (pattern: string, options?: GlobOptions): RegExp => {
   let regexStr = '';
   let i = 0;
   // Helper to parse a brace group like {a,b,c}. No nesting support.
@@ -43,7 +48,7 @@ export const toRegex = (pattern: string): RegExp => {
       return '\\{' + escapeRe(cur);
     }
     // Convert each part recursively to support globs inside braces
-    const alt = parts.map((p) => toRegex(p).source.replace(/^\^/, '').replace(/\$$/, '')).join('|');
+    const alt = parts.map((p) => toRegex(p, options).source.replace(/^\^/, '').replace(/\$$/, '')).join('|');
     return `(?:${alt})`;
   };
 
@@ -129,7 +134,8 @@ export const toRegex = (pattern: string): RegExp => {
         break;
     }
   }
-  return new RegExp('^' + regexStr + '$');
+  const flags = options?.nocase ? 'i' : '';
+  return new RegExp('^' + regexStr + '$', flags);
 };
 
 /**
@@ -146,7 +152,7 @@ export type Matcher = (path: string) => boolean;
 
 const isRegExp = /^\/(.{1,4096})\/([gimsuy]{0,6})$/;
 
-export const toMatcher = (pattern: Pattern): Matcher => {
+export const toMatcher = (pattern: Pattern, options?: GlobOptions): Matcher => {
   const regexes: RegExp[] = [];
   const patterns: (string | RegExp)[] = Array.isArray(pattern) ? pattern : [pattern];
   for (const pat of patterns) {
@@ -156,7 +162,7 @@ export const toMatcher = (pattern: Pattern): Matcher => {
         const [, expr, flags] = match;
         regexes.push(new RegExp(expr, flags));
       } else {
-        regexes.push(toRegex(pat));
+        regexes.push(toRegex(pat, options));
       }
     } else {
       regexes.push(pat);

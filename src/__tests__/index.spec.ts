@@ -79,6 +79,31 @@ describe('glob-to-regex/toRegex', () => {
     expect(re.test('dir/a/b.jsx')).toBe(true);
     expect(re.test('a.cs')).toBe(false);
   });
+
+  test('nocase option - case insensitive matching', () => {
+    const re = toRegex('src/**/*.TXT', {nocase: true});
+    expect(re.test('src/file.txt')).toBe(true);
+    expect(re.test('src/file.TXT')).toBe(true);
+    expect(re.test('src/file.Txt')).toBe(true);
+    expect(re.test('src/a/b/FILE.txt')).toBe(true);
+    expect(re.test('src/a/b/FILE.TXT')).toBe(true);
+  });
+
+  test('nocase option disabled - case sensitive (default)', () => {
+    const re = toRegex('src/**/*.txt');
+    expect(re.test('src/file.txt')).toBe(true);
+    expect(re.test('src/file.TXT')).toBe(false);
+    expect(re.test('src/file.Txt')).toBe(false);
+  });
+
+  test('nocase with braces', () => {
+    const re = toRegex('*.{HTML,TXT}', {nocase: true});
+    expect(re.test('file.html')).toBe(true);
+    expect(re.test('file.HTML')).toBe(true);
+    expect(re.test('file.txt')).toBe(true);
+    expect(re.test('file.TXT')).toBe(true);
+    expect(re.test('file.Html')).toBe(true);
+  });
 });
 
 describe('glob-to-regex/toMatcher', () => {
@@ -190,5 +215,22 @@ describe('glob-to-regex/toMatcher', () => {
     const matcher = toMatcher([]);
     expect(matcher('anything.txt')).toBe(false);
     expect(matcher('')).toBe(false);
+  });
+
+  test('nocase option - case insensitive matching', () => {
+    const matcher = toMatcher('src/**/*.TXT', {nocase: true});
+    expect(matcher('src/file.txt')).toBe(true);
+    expect(matcher('src/file.TXT')).toBe(true);
+    expect(matcher('src/file.Txt')).toBe(true);
+    expect(matcher('src/a/b/FILE.txt')).toBe(true);
+  });
+
+  test('nocase with array patterns', () => {
+    const matcher = toMatcher(['*.JS', '*.TS'], {nocase: true});
+    expect(matcher('test.js')).toBe(true);
+    expect(matcher('test.JS')).toBe(true);
+    expect(matcher('test.ts')).toBe(true);
+    expect(matcher('test.TS')).toBe(true);
+    expect(matcher('test.Js')).toBe(true);
   });
 });
