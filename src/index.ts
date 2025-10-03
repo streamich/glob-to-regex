@@ -1,8 +1,71 @@
 const escapeRe = (ch: string) => (/[.^$+{}()|\\]/.test(ch) ? `\\${ch}` : ch);
 
+/**
+ * Parse an extended glob pattern like ?(a|b|c)
+ * Returns the regex string equivalent and the new index position
+ */
+const parseExtGlob = (
+  pattern: string,
+  startIdx: number,
+  prefix: string,
+  options?: GlobOptions,
+): [regex: string, endIdx: number] | undefined => {
+  let i = startIdx; // startIdx should be pointing at the character after '(' 
+  const parts: string[] = [];
+  let cur = '';
+  let depth = 1; // Track parenthesis depth for nested patterns
+  while (i < pattern.length && depth > 0) {
+    const ch = pattern[i];
+    if (ch === '(') {
+      depth++;
+      cur += ch;
+      i++;
+    } else if (ch === ')') {
+      depth--;
+      if (depth === 0) { // Found the closing parenthesis
+        parts.push(cur);
+        i++; // consume ')'
+        break;
+      } else {
+        cur += ch;
+        i++;
+      }
+    } else if (ch === '|' && depth === 1) { // Pipe separator at top level of this extglob
+      parts.push(cur);
+      cur = '';
+      i++;
+    } else {
+      cur += ch;
+      i++;
+    }
+  }
+  if (depth !== 0) return; // Unclosed parenthesis
+  let alternatives = '';
+  const length = parts.length;
+  for (let j = 0; j < length; j++)
+    alternatives += (alternatives ? '|' : '') + toRegex(parts[j], options).source.replace(/^\^/, '').replace(/\$$/, '');
+  switch (prefix) {
+    case '?': // zero or one
+      return [`(?:${alternatives})?`, i];
+    case '*': // zero or more
+      return [`(?:${alternatives})*`, i];
+    case '+': // one or more
+      return [`(?:${alternatives})+`, i];
+    case '@': // exactly one
+      return [`(?:${alternatives})`, i];
+    case '!': // none of (negative match)
+      // For negation, we need to match anything that doesn't match the pattern
+      // Use negative lookahead without consuming characters after
+      return [`(?!${alternatives})[^/]*`, i];
+  }
+  return;
+};
+
 export interface GlobOptions {
   /** Treat pattern as case insensitive */
   nocase?: boolean;
+  /** Enable extended globbing: ?(pattern), *(pattern), +(pattern), @(pattern), !(pattern) */
+  extglob?: boolean;
 }
 
 /**
@@ -15,6 +78,12 @@ export interface GlobOptions {
  * - `**` to match any number of path segments, including none
  * - `{}` to group conditions (e.g. `{html,txt}`)
  * - `[abc]`, `[a-z]`, `[!a-z]`, `[!abc]` character classes
+ * - Extended globbing (when `extglob: true` option is set):
+ *   - `?(pattern-list)` zero or one occurrence
+ *   - `*(pattern-list)` zero or more occurrences
+ *   - `+(pattern-list)` one or more occurrences
+ *   - `@(pattern-list)` exactly one of the patterns
+ *   - `!(pattern-list)` anything except the patterns
  */
 export const toRegex = (pattern: string, options?: GlobOptions): RegExp => {
   let regexStr = '';
@@ -51,9 +120,24 @@ export const toRegex = (pattern: string, options?: GlobOptions): RegExp => {
     const alt = parts.map((p) => toRegex(p, options).source.replace(/^\^/, '').replace(/\$$/, '')).join('|');
     return `(?:${alt})`;
   };
+  const extglob = !!options?.extglob;
 
   while (i < pattern.length) {
     const char = pattern[i];
+    
+    // Check for extended glob patterns when extglob is enabled
+    if (extglob && pattern[i + 1] === '(') {
+      if (char === '?' || char === '*' || char === '+' || char === '@' || char === '!') {
+        const result = parseExtGlob(pattern, i + 2, char, options);
+        if (result) {
+          regexStr += result[0];
+          i = result[1];
+          continue;
+        }
+        // If parse failed, fall through to normal handling
+      }
+    }
+    
     switch (char) {
       case '*': {
         // Check for double star **

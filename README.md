@@ -46,6 +46,13 @@ match('types.d.ts');  // true (negation is not parsed specially)
 - `**` matches across path segments, including none
 - `{a,b,c}` alternation groups (no nesting). Each item inside can itself contain glob syntax
 - Character classes: `[abc]`, `[a-z]`, `[!a-z]`, `[!abc]`
+- **Extended globbing** (when `extglob: true` option is set):
+  - `?(pattern-list)` matches zero or one occurrence of the given patterns
+  - `*(pattern-list)` matches zero or more occurrences of the given patterns
+  - `+(pattern-list)` matches one or more occurrences of the given patterns
+  - `@(pattern-list)` matches exactly one of the given patterns
+  - `!(pattern-list)` matches anything except one of the given patterns
+  - Pattern lists use `|` as separator (e.g., `@(jpg|png|gif)`)
 
 Notes:
 - The produced RegExp is anchored at start and end (`^...$`).
@@ -66,6 +73,15 @@ toRegex('src/{a,b}/**/*.ts').test('src/b/x/y.ts'); // true
 toRegex('file[0-9].txt').test('file5.txt');        // true
 toRegex('file[!0-9].txt').test('filea.txt');       // true
 toRegex('**/*.[jt]s{,x}').test('dir/a/b.jsx');     // true
+
+// Extended globbing examples
+toRegex('file?(s).txt', {extglob: true}).test('file.txt');  // true
+toRegex('file?(s).txt', {extglob: true}).test('files.txt'); // true
+toRegex('file.@(jpg|png|gif)', {extglob: true}).test('file.jpg'); // true
+toRegex('/var/log/!(*.gz)', {extglob: true}).test('/var/log/syslog'); // true
+toRegex('/var/log/!(*.gz)', {extglob: true}).test('/var/log/error.log.gz'); // false
+toRegex('src/**/!(*.test).js', {extglob: true}).test('src/app.test.js'); // false
+toRegex('src/**/!(*.test).js', {extglob: true}).test('src/index.js'); // true
 ```
 
 ## TypeScript
