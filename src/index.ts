@@ -10,7 +10,7 @@ const parseExtGlob = (
   prefix: string,
   options?: GlobOptions,
 ): [regex: string, endIdx: number] | undefined => {
-  let i = startIdx; // startIdx should be pointing at the character after '(' 
+  let i = startIdx; // startIdx should be pointing at the character after '('
   const parts: string[] = [];
   let cur = '';
   let depth = 1; // Track parenthesis depth for nested patterns
@@ -22,7 +22,8 @@ const parseExtGlob = (
       i++;
     } else if (ch === ')') {
       depth--;
-      if (depth === 0) { // Found the closing parenthesis
+      if (depth === 0) {
+        // Found the closing parenthesis
         parts.push(cur);
         i++; // consume ')'
         break;
@@ -30,7 +31,8 @@ const parseExtGlob = (
         cur += ch;
         i++;
       }
-    } else if (ch === '|' && depth === 1) { // Pipe separator at top level of this extglob
+    } else if (ch === '|' && depth === 1) {
+      // Pipe separator at top level of this extglob
       parts.push(cur);
       cur = '';
       i++;
@@ -124,7 +126,7 @@ export const toRegex = (pattern: string, options?: GlobOptions): RegExp => {
 
   while (i < pattern.length) {
     const char = pattern[i];
-    
+
     // Check for extended glob patterns when extglob is enabled
     if (extglob && pattern[i + 1] === '(') {
       if (char === '?' || char === '*' || char === '+' || char === '@' || char === '!') {
@@ -137,7 +139,7 @@ export const toRegex = (pattern: string, options?: GlobOptions): RegExp => {
         // If parse failed, fall through to normal handling
       }
     }
-    
+
     switch (char) {
       case '*': {
         // Check for double star **
