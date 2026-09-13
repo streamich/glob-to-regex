@@ -569,6 +569,16 @@ describe('glob-to-regex/toRegex character classes', () => {
     expect(toRegex('*(*.js|*.ts)', {extglob: true}).test('')).toBe(true);
   });
 
+  test('a class of one magic character matches that character', () => {
+    expect(toRegex('star[*].txt').test('star*.txt')).toBe(true);
+    expect(toRegex('star[*].txt').test('star.txt')).toBe(false);
+    expect(toRegex('a[?]b').test('a?b')).toBe(true);
+    expect(toRegex('a[?]b').test('ab')).toBe(false);
+    expect(toRegex('a[[]b').test('a[b')).toBe(true);
+    expect(toRegex('a[[]b').test('ab')).toBe(false);
+    expect(toRegex('[*]', {dot: false}).test('*')).toBe(true);
+  });
+
   test('a dash at either end is literal', () => {
     expect(toRegex('[a-]').test('-')).toBe(true);
     expect(toRegex('[-a]').test('-')).toBe(true);
