@@ -38,6 +38,9 @@ const GLOBSTAR_NODOT = '[^/]*(?:/(?!\\.)[^/]*)*';
 const literal = (pattern: string, i: number, code: number): string => {
   switch (code) {
     case Code.Dollar:
+    case Code.Star:
+    case Code.Qmark:
+    case Code.LBracket:
     case Code.LParen:
     case Code.RParen:
     case Code.Plus:
