@@ -1,5 +1,5 @@
 import {describe, test, expect} from 'vitest';
-import {toMatcher, toRegex} from '..';
+import {expandBraces, toMatcher, toRegex} from '..';
 
 describe('glob-to-regex/toRegex', () => {
   test('literal path', () => {
@@ -414,5 +414,355 @@ describe('glob-to-regex/toMatcher', () => {
     expect(matcher('test.ts')).toBe(true);
     expect(matcher('test.TS')).toBe(true);
     expect(matcher('test.Js')).toBe(true);
+  });
+});
+
+describe('glob-to-regex/toRegex negation !(...)', () => {
+  const opts = {extglob: true};
+
+  test('!(a) rejects only "a", not every name that starts with it', () => {
+    const re = toRegex('!(a)', opts);
+    expect(re.test('a')).toBe(false);
+    expect(re.test('b')).toBe(true);
+    expect(re.test('ab')).toBe(true);
+    expect(re.test('abc')).toBe(true);
+    expect(re.test('a.js')).toBe(true);
+  });
+
+  test('!(a).js rejects a.js and nothing else ending in .js', () => {
+    const re = toRegex('!(a).js', opts);
+    expect(re.test('a.js')).toBe(false);
+    expect(re.test('ab.js')).toBe(true);
+    expect(re.test('b.js')).toBe(true);
+    expect(re.test('a.js.js')).toBe(true);
+    expect(re.test('a.ts')).toBe(false);
+  });
+
+  test('!(a|b*) with several alternatives', () => {
+    const re = toRegex('!(a|b*)', opts);
+    expect(re.test('a')).toBe(false);
+    expect(re.test('b')).toBe(false);
+    expect(re.test('bx')).toBe(false);
+    expect(re.test('ab')).toBe(true);
+    expect(re.test('cb')).toBe(true);
+  });
+
+  test('!() matches any non-empty segment', () => {
+    const re = toRegex('!()', opts);
+    expect(re.test('')).toBe(false);
+    expect(re.test('a')).toBe(true);
+    expect(re.test('a/b')).toBe(false);
+  });
+
+  test('nested negation !(!(a))', () => {
+    const re = toRegex('!(!(a))', opts);
+    expect(re.test('a')).toBe(true);
+    expect(re.test('ab')).toBe(false);
+    expect(re.test('b')).toBe(false);
+  });
+
+  test('negation inside another group sees the text after the group', () => {
+    const re = toRegex('@(!(a)|b)c', opts);
+    expect(re.test('abc')).toBe(true);
+    expect(re.test('bc')).toBe(true);
+    expect(re.test('ac')).toBe(false);
+    expect(re.test('xc')).toBe(true);
+  });
+
+  test('negation inside a repetition', () => {
+    const re = toRegex('*(!(a))', opts);
+    expect(re.test('')).toBe(true);
+    expect(re.test('ab')).toBe(true);
+    expect(re.test('a')).toBe(false);
+  });
+
+  test('negation before a globstar', () => {
+    const re = toRegex('!(a)/**', opts);
+    expect(re.test('a/x')).toBe(false);
+    expect(re.test('ab/x')).toBe(true);
+    expect(re.test('ab/x/y')).toBe(true);
+  });
+
+  test('negation after a globstar', () => {
+    const re = toRegex('**/!(a)', opts);
+    expect(re.test('src/a.js')).toBe(true);
+    expect(re.test('src/b/a.js')).toBe(true);
+    expect(re.test('x/a')).toBe(false);
+    expect(re.test('a')).toBe(false);
+    expect(re.test('ab')).toBe(true);
+  });
+
+  test('negation inside braces', () => {
+    const re = toRegex('!(a).{js,ts}', opts);
+    expect(re.test('a.js')).toBe(false);
+    expect(re.test('a.ts')).toBe(false);
+    expect(re.test('b.js')).toBe(true);
+    expect(re.test('ab.ts')).toBe(true);
+  });
+
+  test('two negations in one segment', () => {
+    const re = toRegex('!(a)!(b)', opts);
+    expect(re.test('ab')).toBe(true);
+    expect(re.test('xy')).toBe(true);
+    expect(re.test('b')).toBe(true);
+  });
+});
+
+describe('glob-to-regex/toRegex character classes', () => {
+  test('leading ] is a member of the class', () => {
+    const re = toRegex('[]a]');
+    expect(re.test(']')).toBe(true);
+    expect(re.test('a')).toBe(true);
+    expect(re.test('b')).toBe(false);
+    expect(re.test('a]')).toBe(false);
+    expect(toRegex('[]]').test(']')).toBe(true);
+    expect(toRegex('[]a].js').test('].js')).toBe(true);
+  });
+
+  test('leading ] in a negated class', () => {
+    const re = toRegex('[!]a]');
+    expect(re.test(']')).toBe(false);
+    expect(re.test('a')).toBe(false);
+    expect(re.test('b')).toBe(true);
+  });
+
+  test('^ negates like !', () => {
+    const re = toRegex('[^a-c]');
+    expect(re.test('b')).toBe(false);
+    expect(re.test('d')).toBe(true);
+  });
+
+  test('unclosed class is literal and keeps the rest of the pattern', () => {
+    const re = toRegex('a[bc');
+    expect(re.test('a[bc')).toBe(true);
+    expect(re.test('a[')).toBe(false);
+    expect(toRegex('[').test('[')).toBe(true);
+    expect(toRegex('[]').test('[]')).toBe(true);
+  });
+
+  test('POSIX classes', () => {
+    expect(toRegex('[[:alpha:]]').test('a')).toBe(true);
+    expect(toRegex('[[:alpha:]]').test('1')).toBe(false);
+    expect(toRegex('[[:digit:]]*').test('123')).toBe(true);
+    expect(toRegex('[[:digit:]]*').test('a12')).toBe(false);
+    expect(toRegex('[a[:digit:]]').test('5')).toBe(true);
+    expect(toRegex('[a[:digit:]]').test('a')).toBe(true);
+    expect(toRegex('[a[:digit:]]').test('b')).toBe(false);
+    expect(toRegex('[![:space:]]').test(' ')).toBe(false);
+    expect(toRegex('[[:upper:]][[:lower:]]').test('Ab')).toBe(true);
+  });
+
+  test('inverted range is dropped instead of throwing', () => {
+    expect(() => toRegex('[z-a]')).not.toThrow();
+    expect(toRegex('[z-a]').test('m')).toBe(false);
+    expect(toRegex('[z-ab]').test('b')).toBe(true);
+  });
+
+  test('a segment that is just * needs at least one character', () => {
+    expect(toRegex('*').test('')).toBe(false);
+    expect(toRegex('a/*').test('a/')).toBe(false);
+    expect(toRegex('a/*/b').test('a//b')).toBe(false);
+    expect(toRegex('a/*/b').test('a/x/b')).toBe(true);
+    expect(toRegex('a/*x').test('a/x')).toBe(true);
+    expect(toRegex('*.js').test('.js')).toBe(true);
+    expect(toRegex('@(*)', {extglob: true}).test('')).toBe(false);
+    expect(toRegex('*(*.js|*.ts)', {extglob: true}).test('')).toBe(true);
+  });
+
+  test('a dash at either end is literal', () => {
+    expect(toRegex('[a-]').test('-')).toBe(true);
+    expect(toRegex('[-a]').test('-')).toBe(true);
+    expect(toRegex('[-a]').test('b')).toBe(false);
+  });
+});
+
+describe('glob-to-regex/toRegex dot option', () => {
+  const nodot = {dot: false, extglob: true};
+
+  test('dotfiles match by default', () => {
+    expect(toRegex('*').test('.a')).toBe(true);
+    expect(toRegex('*/*').test('.a/.b')).toBe(true);
+    expect(toRegex('**').test('.a/.b')).toBe(true);
+  });
+
+  test('* ? and classes do not match a leading dot', () => {
+    expect(toRegex('*', nodot).test('.a')).toBe(false);
+    expect(toRegex('*', nodot).test('a.b')).toBe(true);
+    expect(toRegex('?a', nodot).test('.a')).toBe(false);
+    expect(toRegex('a?', nodot).test('a.')).toBe(true);
+    expect(toRegex('[.a]b', nodot).test('.b')).toBe(false);
+    expect(toRegex('[!a]b', nodot).test('.b')).toBe(false);
+    expect(toRegex('*.js', nodot).test('.eslintrc.js')).toBe(false);
+  });
+
+  test('a literal dot matches a dotfile', () => {
+    expect(toRegex('.*', nodot).test('.a')).toBe(true);
+    expect(toRegex('.?', nodot).test('.a')).toBe(true);
+    expect(toRegex('[.]a', nodot).test('.a')).toBe(true);
+    expect(toRegex('{.a,b}', nodot).test('.a')).toBe(true);
+  });
+
+  test('the rule applies at every segment', () => {
+    const re = toRegex('*/*', nodot);
+    expect(re.test('a/b')).toBe(true);
+    expect(re.test('a/.b')).toBe(false);
+    expect(re.test('.a/b')).toBe(false);
+    expect(toRegex('src/*.js', nodot).test('src/.a.js')).toBe(false);
+  });
+
+  test('globstar skips dot directories', () => {
+    const re = toRegex('**/*.js', nodot);
+    expect(re.test('a.js')).toBe(true);
+    expect(re.test('src/b/a.js')).toBe(true);
+    expect(re.test('src/.b/a.js')).toBe(false);
+    expect(re.test('.src/a.js')).toBe(false);
+    expect(re.test('src/.a.js')).toBe(false);
+    const tail = toRegex('src/**', nodot);
+    expect(tail.test('src/a/b')).toBe(true);
+    expect(tail.test('src/.a')).toBe(false);
+    expect(tail.test('src/a/.b')).toBe(false);
+    const mid = toRegex('a/**/b', nodot);
+    expect(mid.test('a/b')).toBe(true);
+    expect(mid.test('a/x/y/b')).toBe(true);
+    expect(mid.test('a/.x/b')).toBe(false);
+    expect(toRegex('.*/**', nodot).test('.a/b')).toBe(true);
+    expect(toRegex('.*/**', nodot).test('.a/.b')).toBe(false);
+    expect(toRegex('**/.a', nodot).test('x/.a')).toBe(true);
+  });
+
+  test('extglobs at the start of a segment', () => {
+    expect(toRegex('@(.a|b)', nodot).test('.a')).toBe(true);
+    expect(toRegex('@(.a|b)', nodot).test('.b')).toBe(false);
+    expect(toRegex('@(*|b)', nodot).test('.b')).toBe(false);
+    expect(toRegex('?(.)a', nodot).test('.a')).toBe(true);
+    expect(toRegex('+(a|.b)', nodot).test('.b')).toBe(true);
+    expect(toRegex('!(a)', nodot).test('.b')).toBe(false);
+    expect(toRegex('!()', nodot).test('.b')).toBe(false);
+    expect(toRegex('!(a)', nodot).test('b')).toBe(true);
+  });
+
+  test('only the first repetition is guarded, so *(?) matches x.y', () => {
+    expect(toRegex('*(?)', nodot).test('x.y')).toBe(true);
+    expect(toRegex('*(?)', nodot).test('.x')).toBe(false);
+    expect(toRegex('+(?)', nodot).test('x.y')).toBe(true);
+    expect(toRegex('+(?)', nodot).test('.x')).toBe(false);
+    expect(toRegex('*(.a)', nodot).test('.a')).toBe(true);
+  });
+
+  test('toMatcher passes the option through', () => {
+    expect(toMatcher('*.js', {dot: false})('.a.js')).toBe(false);
+    expect(toMatcher('*.js')('.a.js')).toBe(true);
+  });
+});
+
+describe('glob-to-regex/toRegex braces', () => {
+  test('nested groups', () => {
+    const re = toRegex('{a,{b,c}}.js');
+    expect(re.test('a.js')).toBe(true);
+    expect(re.test('b.js')).toBe(true);
+    expect(re.test('c.js')).toBe(true);
+    expect(re.test('d.js')).toBe(false);
+    expect(re.test('ab.js')).toBe(false);
+    expect(re.test('bc.js')).toBe(false);
+    expect(re.test('ac.js')).toBe(false);
+  });
+
+  test('numeric and alphabetic ranges', () => {
+    const re = toRegex('v{1..3}');
+    expect(re.test('v1')).toBe(true);
+    expect(re.test('v3')).toBe(true);
+    expect(re.test('v4')).toBe(false);
+    expect(toRegex('{a..c}').test('b')).toBe(true);
+    expect(toRegex('{a..c}').test('d')).toBe(false);
+    expect(toRegex('{01..3}').test('02')).toBe(true);
+    expect(toRegex('{01..3}').test('2')).toBe(false);
+  });
+
+  test('a group without a comma or range is literal', () => {
+    expect(toRegex('{a}').test('{a}')).toBe(true);
+    expect(toRegex('{a}').test('a')).toBe(false);
+    expect(toRegex('{}').test('{}')).toBe(true);
+    expect(toRegex('*.{js}').test('a.{js}')).toBe(true);
+  });
+
+  test('an unclosed brace is literal', () => {
+    expect(toRegex('x{a,b').test('x{a,b')).toBe(true);
+    expect(toRegex('{a{b,c}').test('{ab')).toBe(true);
+  });
+
+  test('groups combine', () => {
+    const re = toRegex('{a,b}{c,d}');
+    expect(re.test('ac')).toBe(true);
+    expect(re.test('bd')).toBe(true);
+    expect(re.test('ab')).toBe(false);
+  });
+
+  test('empty alternative', () => {
+    const re = toRegex('x{,a}');
+    expect(re.test('x')).toBe(true);
+    expect(re.test('xa')).toBe(true);
+    expect(re.test('xb')).toBe(false);
+  });
+
+  test('globs inside alternatives and around them', () => {
+    const re = toRegex('src/{*.ts,lib/**}');
+    expect(re.test('src/a.ts')).toBe(true);
+    expect(re.test('src/lib/x/y')).toBe(true);
+    expect(re.test('src/a.js')).toBe(false);
+  });
+});
+
+describe('glob-to-regex/expandBraces', () => {
+  test('alternation', () => {
+    expect(expandBraces('a{b,c}d')).toEqual(['abd', 'acd']);
+    expect(expandBraces('{a,b}{c,d}')).toEqual(['ac', 'ad', 'bc', 'bd']);
+    expect(expandBraces('{a,{b,c}}')).toEqual(['a', 'b', 'c']);
+    expect(expandBraces('x{,a}')).toEqual(['x', 'xa']);
+  });
+
+  test('ranges', () => {
+    expect(expandBraces('{1..3}')).toEqual(['1', '2', '3']);
+    expect(expandBraces('{3..1}')).toEqual(['3', '2', '1']);
+    expect(expandBraces('{1..10..3}')).toEqual(['1', '4', '7', '10']);
+    expect(expandBraces('{01..3}')).toEqual(['01', '02', '03']);
+    expect(expandBraces('{-1..1}')).toEqual(['-1', '0', '1']);
+    expect(expandBraces('{a..e..2}')).toEqual(['a', 'c', 'e']);
+    expect(expandBraces('{1..3,x}')).toEqual(['1..3', 'x']);
+  });
+
+  test('literals', () => {
+    expect(expandBraces('plain')).toEqual(['plain']);
+    expect(expandBraces('{a}')).toEqual(['{a}']);
+    expect(expandBraces('{}')).toEqual(['{}']);
+    expect(expandBraces('x{a,b')).toEqual(['x{a,b']);
+    expect(expandBraces('{a}{b,c}')).toEqual(['{a}b', '{a}c']);
+    expect(expandBraces('{a{b,c}')).toEqual(['{ab', '{ac']);
+  });
+
+  test('stops at max', () => {
+    expect(expandBraces('{1..100}', 3)).toEqual(['1', '2', '3']);
+    expect(expandBraces('{a,b}{c,d}', 3)).toHaveLength(3);
+  });
+});
+
+describe('glob-to-regex/toRegex globstar', () => {
+  test('adjacent globstars collapse into one', () => {
+    expect(toRegex('**/**/*.js').source).toBe(toRegex('**/*.js').source);
+    expect(toRegex('a/**/**').source).toBe(toRegex('a/**').source);
+    expect(toRegex('a/**/**/b', {dot: false}).source).toBe(toRegex('a/**/b', {dot: false}).source);
+    const re = toRegex('a/**/**/b');
+    expect(re.test('a/b')).toBe(true);
+    expect(re.test('a/x/y/b')).toBe(true);
+    expect(re.test('a/xb')).toBe(false);
+  });
+
+  test('a long path with many segments matches in linear-ish time', () => {
+    const path = Array(5000).fill('segment').join('/') + '/x.txt';
+    for (const options of [{}, {dot: false}]) {
+      const re = toRegex('**/**/a/**/*.js', options);
+      const start = Date.now();
+      expect(re.test(path)).toBe(false);
+      expect(Date.now() - start).toBeLessThan(500);
+    }
   });
 });
